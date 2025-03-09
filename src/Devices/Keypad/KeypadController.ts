@@ -34,7 +34,7 @@ export class KeypadController extends Common<KeypadState> implements Keypad {
             state: "Off",
         });
 
-        if (device.DeviceType === "SunnataKeypad" || device.DeviceType === "SunnataHybridKeypad") {
+        if (device.DeviceType === "SunnataKeypad" || device.DeviceType === "SunnataHybridKeypad" || device.DeviceType === "SeeTouchHybridKeypad") {
             this.processor
                 .buttons(this.address)
                 .then((groups) => {

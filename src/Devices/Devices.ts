@@ -111,6 +111,7 @@ export function parseDeviceType(value: string): DeviceType {
         case "SunnataSwitch":
         case "SunnataKeypad":
         case "SunnataHybridKeypad":
+        case "SeeTouchHybridKeypad":
             return DeviceType.Keypad;
 
         case "RPSCeilingMountedOccupancySensor":
@@ -147,6 +148,7 @@ export function isAddressable(device: DeviceAddress): boolean {
 
         case "SunnataKeypad":
         case "SunnataHybridKeypad":
+        case "SeeTouchHybridKeypad":
             return true;
 
         case "RPSCeilingMountedOccupancySensor":
