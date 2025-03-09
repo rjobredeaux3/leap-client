@@ -25,6 +25,7 @@ import { TimeclockAddress } from "../../Response/TimeclockAddress";
 import { TimeclockStatus } from "../../Response/TimeclockStatus";
 import { ZoneAddress } from "../../Response/ZoneAddress";
 import { ZoneStatus } from "../../Response/ZoneStatus";
+import { Logging } from "homebridge";
 
 /**
  * Defines a LEAP processor. This could be a Caseta Smart Bridge, RA2/RA3
@@ -43,7 +44,7 @@ export class ProcessorController
     private uuid: string;
     private connection: Connection;
     private logger: ILogger;
-
+    private hblog?: Logging;
     private cache: Cache.Cache;
     private discovered: Map<string, Device> = new Map();
 
@@ -53,9 +54,9 @@ export class ProcessorController
      * @param id The processor UUID.
      * @param connection A reference to the connection to the processor.
      */
-    constructor(id: string, connection: Connection) {
+    constructor(id: string, connection: Connection, hblog?: Logging) {
         super();
-
+        this.hblog = hblog;
         this.uuid = id;
         this.logger = getLogger(`Processor ${Colors.dim(this.id)}`);
         this.connection = connection;
@@ -136,6 +137,7 @@ export class ProcessorController
      * @param url The url to read.
      * @returns A response object.
      */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public read<PAYLOAD = any>(url: string): Promise<PAYLOAD> {
         return this.connection.read<PAYLOAD>(url);
     }
@@ -197,10 +199,21 @@ export class ProcessorController
      * @returns An array of area objects.
      */
     public areas(): Promise<AreaAddress[]> {
+        if (this.hblog) {
+            this.hblog.warn("Getting areas.");
+        }
         return new Promise((resolve, reject) => {
             const cached = this.cache.getKey("/area");
 
-            if (cached != null) return resolve(cached);
+            if (cached != null) {
+                if (this.hblog) {
+                    this.hblog.warn("Areas cached.");
+                }
+                return resolve(cached);
+            }
+            if (this.hblog) {
+                this.hblog.warn("Areas not cached.");
+            }
 
             this.connection
                 .read<AreaAddress[]>("/area")
@@ -299,6 +312,9 @@ export class ProcessorController
      * @returns An array of control station objects.
      */
     public controls(address: Address): Promise<ControlStation[]> {
+        if (this.hblog) {
+            this.hblog.warn("Getting controls.");
+        }
         return new Promise((resolve, reject) => {
             const cached = this.cache.getKey(`${address.href}/associatedcontrolstation`);
 
@@ -307,6 +323,9 @@ export class ProcessorController
             this.connection
                 .read<ControlStation[]>(`${address.href}/associatedcontrolstation`)
                 .then((response) => {
+                    if (this.hblog) {
+                        this.hblog.warn("Controls fetched.");
+                    }
                     this.cache.setKey(`${address.href}/associatedcontrolstation`, response);
                     this.cache.save(true);
 
@@ -327,9 +346,18 @@ export class ProcessorController
     public device(address: Address): Promise<DeviceAddress> {
         return new Promise((resolve, reject) => {
             const cached = this.cache.getKey(address.href);
-
-            if (cached != null) return resolve(cached);
-
+            if (this.hblog) {
+                this.hblog.warn("Getting device.");
+            }
+            if (cached != null) {
+                if (this.hblog) {
+                    this.hblog.warn("Device cached.");
+                }
+                return resolve(cached);
+            }
+            if (this.hblog) {
+                this.hblog.warn("Device not cached.");
+            }
             this.connection
                 .read<DeviceAddress>(address.href)
                 .then((response) => {
@@ -419,6 +447,7 @@ export class ProcessorController
      * Listener for when the connection is dropped.
      */
     private onDisconnect = (): void => {
+        this.hblog?.warn("Processor disconnected.");
         this.log.info("disconnected");
         this.emit("Disconnect");
     };
@@ -427,6 +456,7 @@ export class ProcessorController
      * Listener for when there is an error in the connection.
      */
     private onError = (error: Error): void => {
+        this.hblog?.error("Processor error: ", error);
         this.emit("Error", error);
     };
 }

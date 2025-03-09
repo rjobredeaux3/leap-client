@@ -18,6 +18,7 @@ import { Response } from "../Response/Response";
 import { RequestType } from "../Response/RequestType";
 import { Socket } from "./Socket";
 import { Subscription } from "../Response/Subscription";
+import { Logging } from "homebridge";
 
 const SOCKET_PORT = 8083;
 const SECURE_SOCKET_PORT = 8081;
@@ -43,7 +44,7 @@ export class Connection extends Parser<{
 
     private requests: Map<string, InflightMessage> = new Map();
     private subscriptions: Map<string, Subscription> = new Map();
-
+    private hblog?: Logging;
     /**
      * Creates a new connection to a device.
      *
@@ -54,9 +55,9 @@ export class Connection extends Parser<{
      * @param host The ip address of the device.
      * @param certificate Authentication certificate.
      */
-    constructor(host: string, certificate?: Certificate) {
+    constructor(host: string, certificate?: Certificate, log?: Logging) {
         super();
-
+        this.hblog=log;
         this.host = host;
         this.secure = certificate != null;
 
@@ -102,12 +103,13 @@ export class Connection extends Parser<{
      * ```
      */
     public connect(): Promise<void> {
+        this.hblog?.warn("Connecting to device");
         return new Promise((resolve, reject) => {
             this.teardown = false;
             this.socket = undefined;
 
             const subscriptions = [...this.subscriptions.values()];
-            const socket = new Socket(this.host, this.secure ? SECURE_SOCKET_PORT : SOCKET_PORT, this.certificate);
+            const socket = new Socket(this.host, this.secure ? SECURE_SOCKET_PORT : SOCKET_PORT, this.certificate, this.hblog);
 
             socket.on("Data", this.onSocketData);
             socket.on("Error", this.onSocketError);
@@ -116,6 +118,7 @@ export class Connection extends Parser<{
             socket
                 .connect()
                 .then((protocol) => {
+                    this.hblog?.warn("Socket connection complete.");
                     this.physicalAccess(this.secure).then(() => {
                         const waits: Promise<void>[] = [];
 
@@ -131,7 +134,7 @@ export class Connection extends Parser<{
 
                         Promise.all(waits).then(() => {
                             this.emit("Connect", protocol);
-
+                            this.hblog?.warn("Connection complete.");
                             resolve();
                         });
                     });
@@ -148,6 +151,7 @@ export class Connection extends Parser<{
      * ```
      */
     public disconnect() {
+        this.hblog?.warn("Disconnecting from device");
         this.teardown = true;
 
         if (this.secure) this.drainRequests();
@@ -452,7 +456,7 @@ export class Connection extends Parser<{
      */
     private onSocketData = (data: Buffer): void => {
         if (this.secure) {
-            this.parse(data, this.onResponse);
+            this.parse(data, this.onResponse, this.hblog);
         } else {
             this.emit("Message", JSON.parse(data.toString()));
         }
@@ -464,6 +468,7 @@ export class Connection extends Parser<{
      * is invoked.
      */
     private onSocketDisconnect = (): void => {
+        this.hblog?.warn("Socket disconnected");
         if (!this.teardown) this.emit("Disconnect");
     };
 
@@ -471,6 +476,7 @@ export class Connection extends Parser<{
      * Listener for any error from the socket.
      */
     private onSocketError = (error: Error): void => {
+        this.hblog?.error(error.message);
         this.emit("Error", error);
     };
 

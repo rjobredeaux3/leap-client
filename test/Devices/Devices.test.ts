@@ -113,7 +113,11 @@ describe("Devices", () => {
 
         TEST_CASES.forEach((TEST_CASE) => {
             it(`should define "${TEST_CASE.value}" as "${TEST_CASE.type}"`, () => {
-                expect(parseDeviceType(TEST_CASE.value)).to.equal(TEST_CASE.type);
+                expect(
+                    parseDeviceType(
+                        TEST_CASE.value,
+                    ),
+                ).to.equal(TEST_CASE.type);
             });
         });
     });

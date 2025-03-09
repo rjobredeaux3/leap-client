@@ -16,6 +16,7 @@ import { TimeclockController } from "./Timeclock/TimeclockController";
 import { TimeclockAddress } from "../Response/TimeclockAddress";
 import { UnknownController } from "./Unknown/UnknownController";
 import { ZoneAddress } from "../Response/ZoneAddress";
+import { Logging } from "homebridge";
 
 /**
  * Creates a device by type. This is a device factory.
@@ -28,8 +29,17 @@ import { ZoneAddress } from "../Response/ZoneAddress";
  *          capibilities.
  * @private
  */
-export function createDevice(processor: Processor, area: AreaAddress, definition: unknown): Device {
-    const type = parseDeviceType((definition as ZoneAddress).ControlType || (definition as DeviceAddress).DeviceType);
+export function createDevice(
+    processor: Processor,
+    area: AreaAddress,
+    definition: unknown,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    log?: Logging,
+): Device {
+    const type = parseDeviceType(
+        (definition as ZoneAddress).ControlType || (definition as DeviceAddress).DeviceType,
+        log,
+    );
 
     switch (type) {
         case DeviceType.Contact:
@@ -74,11 +84,12 @@ export function createDevice(processor: Processor, area: AreaAddress, definition
  * Parses a string to a standard device type enum value.
  *
  * @param value A string device type from the processor.
+ * @param log A reference to the logger.
  *
  * @returns A standard device type from the device type enum.
  * @private
  */
-export function parseDeviceType(value: string): DeviceType {
+export function parseDeviceType(value: string, log?: Logging): DeviceType {
     switch (value) {
         case "Switched":
         case "PowPakSwitch":
@@ -113,6 +124,9 @@ export function parseDeviceType(value: string): DeviceType {
         case "SunnataHybridKeypad":
         case "SeeTouchHybridKeypad":
         case "PhantomKeypad":
+            if (log) {
+                log.warn(`Known keypad type: ${value}`);
+            }
             return DeviceType.Keypad;
 
         case "RPSCeilingMountedOccupancySensor":
@@ -122,6 +136,9 @@ export function parseDeviceType(value: string): DeviceType {
             return DeviceType.Contact;
 
         default:
+            if (log) {
+                log.warn(`Unknown device type: ${value}`);
+            }
             return DeviceType.Unknown;
     }
 }

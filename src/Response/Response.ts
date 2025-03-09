@@ -4,6 +4,7 @@ import { RequestType } from "./RequestType";
 import { MessageType } from "./MessageType";
 import { ResponseHeader } from "./ResponseHeader";
 import { ResponseStatus } from "./ResponseStatus";
+import { Logging } from "homebridge";
 
 /**
  * Defines a processor response.
@@ -28,7 +29,8 @@ export class Response {
      *
      * @returns Returns a response object.
      */
-    static parse(value: string): Response {
+    static parse(value: string, log?: Logging): Response {
+        log?.warn(`Parsing: ${value}`);
         const payload = JSON.parse(value);
 
         const status =

@@ -3,6 +3,7 @@ import { connect, createSecureContext, TLSSocket } from "tls";
 
 import { Certificate } from "../Response/Certificate";
 import { Message } from "../Response/Message";
+import { Logging } from "homebridge";
 
 /**
  * Creates a connections underlying socket.
@@ -18,6 +19,7 @@ export class Socket extends EventEmitter<{
     private readonly host: string;
     private readonly port: number;
     private readonly certificate: Certificate;
+    private hblog?: Logging;
 
     /**
      * Creates a socket.
@@ -26,12 +28,13 @@ export class Socket extends EventEmitter<{
      * @param port The port the device listenes on.
      * @param certificate An authentication certificate.
      */
-    constructor(host: string, port: number, certificate: Certificate) {
+    constructor(host: string, port: number, certificate: Certificate, hblog?: Logging) {
         super();
 
         this.host = host;
         this.port = port;
         this.certificate = certificate;
+        this.hblog = hblog;
     }
 
     /**
@@ -40,7 +43,9 @@ export class Socket extends EventEmitter<{
      * @returns A connection protocol.
      */
     public connect(): Promise<string> {
+        this.hblog?.warn("Socket Connecting to processor");
         return new Promise((resolve, reject) => {
+            this.hblog?.warn("Establishing TLS connection");
 
             const attemptConnection = (retries: number, delay: number): void => {
                 const connection = connect(this.port, this.host, {
@@ -50,11 +55,13 @@ export class Socket extends EventEmitter<{
                 });
 
                 const timeoutId = setTimeout(() => {
+                    this.hblog?.warn(`Connection attempt timed out after ${delay}ms`);
                     connection.destroy(new Error("Connection timed out"));
                 }, delay);
 
                 connection.once("secureConnect", (): void => {
                     clearTimeout(timeoutId);
+                    this.hblog?.warn("Connection established");
                     this.connection = connection;
 
                     this.connection.off("error", reject);
@@ -70,7 +77,9 @@ export class Socket extends EventEmitter<{
 
                 connection.once("error", (error) => {
                     clearTimeout(timeoutId);
+                    this.hblog?.warn(`Connection attempt failed: ${error.message}`);
                     if (retries > 0) {
+                        this.hblog?.warn(`Retrying connection...`);
                         if (error.message === "Connection timed out") {
                             attemptConnection(retries - 1, delay * 2);
                         } else {
@@ -90,6 +99,7 @@ export class Socket extends EventEmitter<{
      * Disconnects from a device.
      */
     public disconnect(): void {
+        this.hblog?.warn("Socket Disconnecting from device");
         this.connection?.end();
         this.connection?.destroy();
     }
@@ -122,6 +132,7 @@ export class Socket extends EventEmitter<{
      * Listenes for discrete disconects from the socket.
      */
     private onSocketClose = (): void => {
+        this.hblog?.warn("Socket closing");
         this.emit("Disconnect");
     };
 

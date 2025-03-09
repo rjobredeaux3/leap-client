@@ -13,6 +13,7 @@ import { Association } from "./Connection/Association";
 import { Context } from "./Connection/Context";
 import { Discovery } from "./Connection/Discovery";
 import { Client } from "./Client";
+import { Logging } from "homebridge";
 
 export { Contact } from "./Devices/Contact/Contact";
 export { ContactState } from "./Devices/Contact/ContactState";
@@ -44,8 +45,12 @@ export { Unknown } from "./Devices/Unknown/Unknown";
  * @returns A reference to the location with all processors.
  * @public
  */
-export function connect(refresh?: boolean): Client {
-    return new Client(refresh);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function connect(refresh?: boolean, log?: Logging): Client {
+    if (log) {
+        log.warn("Romain leap");
+    }
+    return new Client(refresh, log);
 }
 
 /**

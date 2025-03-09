@@ -28,6 +28,7 @@ import { ProcessorController } from "./Devices/Processor/ProcessorController";
 import { ProcessorAddress } from "./Response/ProcessorAddress";
 
 import { createDevice, isAddressable, parseDeviceType } from "./Devices/Devices";
+import { Logging } from "homebridge";
 
 const log = getLogger("Client");
 
@@ -43,7 +44,8 @@ export class Client extends EventEmitter<{
 }> {
     private context: Context;
     private refresh: boolean;
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private hblog?: Logging;
     private discovery: Discovery;
     private discovered: Map<string, Processor> = new Map();
 
@@ -58,9 +60,11 @@ export class Client extends EventEmitter<{
      *
      * @param refresh If true, this will ignore any cache and reload.
      */
-    constructor(refresh?: boolean) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(refresh?: boolean, hblog?: Logging) {
         super(Infinity);
-
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any,  @typescript-eslint/no-unused-vars
+        this.hblog = hblog;
         this.context = new Context();
         this.discovery = new Discovery();
         this.refresh = refresh === true;
@@ -92,6 +96,7 @@ export class Client extends EventEmitter<{
      * Closes all connections for a location and stops searching.
      */
     public close(): void {
+        this.hblog?.info("Closing all connections");
         this.discovery.stop();
 
         for (const processor of this.discovered.values()) {
@@ -113,7 +118,7 @@ export class Client extends EventEmitter<{
                 .zones(area)
                 .then((zones) => {
                     for (const zone of zones) {
-                        const device = createDevice(processor, area, zone)
+                        const device = createDevice(processor, area, zone, this.hblog)
                             .on("Update", this.onDeviceUpdate)
                             .on("Action", this.onDeviceAction);
 
@@ -149,6 +154,7 @@ export class Client extends EventEmitter<{
                                 AssociatedOccupancyGroups: [],
                             },
                             { ...timeclock, ControlType: "Timeclock" },
+                            this.hblog,
                         ).on("Update", this.onDeviceUpdate);
 
                         processor.devices.set(timeclock.href, device);
@@ -164,6 +170,9 @@ export class Client extends EventEmitter<{
      * Discovers all keypads and remotes. These are ganged devices.
      */
     private discoverControls(processor: Processor, area: AreaAddress): Promise<void> {
+        if (this.hblog) {
+            this.hblog.info(`Discovering controls for ${area.Name}`);
+        }
         return new Promise((resolve) => {
             if (!area.IsLeaf) return resolve();
 
@@ -173,17 +182,22 @@ export class Client extends EventEmitter<{
                     for (const control of controls) {
                         this.discoverPositions(processor, control).then((positions) => {
                             for (const position of positions) {
-                                const type = parseDeviceType(position.DeviceType);
+                                const type = parseDeviceType(position.DeviceType, this.hblog);
 
                                 const address =
                                     type === DeviceType.Occupancy
                                         ? `/occupancy/${area.href?.split("/")[2]}`
                                         : position.href;
 
-                                const device = createDevice(processor, area, {
-                                    ...position,
-                                    Name: `${area.Name} ${control.Name} ${position.Name}`,
-                                })
+                                const device = createDevice(
+                                    processor,
+                                    area,
+                                    {
+                                        ...position,
+                                        Name: `${area.Name} ${control.Name} ${position.Name}`,
+                                    },
+                                    this.hblog,
+                                )
                                     .on("Update", this.onDeviceUpdate)
                                     .on("Action", this.onDeviceAction);
 
@@ -209,6 +223,9 @@ export class Client extends EventEmitter<{
             const waits: Promise<DeviceAddress>[] = [];
 
             for (const gangedDevice of control.AssociatedGangedDevices) {
+                if (this.hblog) {
+                    this.hblog.info(`Discovering positions for ${gangedDevice.Device.DeviceType}`);
+                }
                 waits.push(processor.device(gangedDevice.Device));
             }
 
@@ -224,12 +241,15 @@ export class Client extends EventEmitter<{
      * Creates a connection when mDNS finds a processor.
      */
     private onDiscovered = (host: ProcessorAddress): void => {
+        if (this.hblog) {
+            this.hblog.info(`Discovered Processor ${host.id}`);
+        }
         this.discovered.delete(host.id);
 
         if (!this.context.has(host.id)) return;
 
         const ip = host.addresses.find((address) => address.family === HostAddressFamily.IPv4) || host.addresses[0];
-        const processor = new ProcessorController(host.id, new Connection(ip.address, this.context.get(host.id)));
+        const processor = new ProcessorController(host.id, new Connection(ip.address, this.context.get(host.id), this.hblog), this.hblog);
 
         this.discovered.set(host.id, processor);
 
@@ -241,6 +261,9 @@ export class Client extends EventEmitter<{
             })
             .on("Connect", () => {
                 if (this.refresh) processor.clear();
+                if (this.hblog) {
+                    this.hblog.info(`Connected to Processor`);
+                }
 
                 Promise.all([processor.system(), processor.project(), processor.areas()])
                     .then(([system, project, areas]) => {
