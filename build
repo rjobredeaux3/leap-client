@@ -61,19 +61,19 @@ jobs.push(
     }),
 );
 
-jobs.push(
-    new Promise((resolve, reject) => {
-        log.info(`generate docs ${colors.cyan(path.resolve(__dirname, "docs"))}`);
+// jobs.push(
+//     new Promise((resolve, reject) => {
+//         log.info(`generate docs ${colors.cyan(path.resolve(__dirname, "docs"))}`);
 
-        proc.exec(path.resolve(__dirname, "node_modules/.bin/typedoc"), (error) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
-        });
-    }),
-);
+//         proc.exec(path.resolve(__dirname, "node_modules/.bin/typedoc"), (error) => {
+//             if (error) {
+//                 reject(error);
+//             } else {
+//                 resolve();
+//             }
+//         });
+//     }),
+// );
 
 Promise.all(jobs)
     .then(() => {
