@@ -41,27 +41,48 @@ export class Socket extends EventEmitter<{
      */
     public connect(): Promise<string> {
         return new Promise((resolve, reject) => {
-            const connection = connect(this.port, this.host, {
-                secureContext: createSecureContext(this.certificate),
-                secureProtocol: "TLS_method",
-                rejectUnauthorized: false,
-            });
 
-            connection.once("secureConnect", (): void => {
-                this.connection = connection;
+            const attemptConnection = (retries: number, delay: number): void => {
+                const connection = connect(this.port, this.host, {
+                    secureContext: createSecureContext(this.certificate),
+                    secureProtocol: "TLS_method",
+                    rejectUnauthorized: false,
+                });
 
-                this.connection.off("error", reject);
+                const timeoutId = setTimeout(() => {
+                    connection.destroy(new Error("Connection timed out"));
+                }, delay);
 
-                this.connection.on("error", this.onSocketError);
-                this.connection.on("close", this.onSocketClose);
-                this.connection.on("data", this.onSocketData);
+                connection.once("secureConnect", (): void => {
+                    clearTimeout(timeoutId);
+                    this.connection = connection;
 
-                this.connection.setKeepAlive(true);
+                    this.connection.off("error", reject);
 
-                resolve(this.connection.getProtocol() || "Unknown");
-            });
+                    this.connection.on("error", this.onSocketError);
+                    this.connection.on("close", this.onSocketClose);
+                    this.connection.on("data", this.onSocketData);
 
-            connection.once("error", reject);
+                    this.connection.setKeepAlive(true);
+
+                    resolve(this.connection.getProtocol() || "Unknown");
+                });
+
+                connection.once("error", (error) => {
+                    clearTimeout(timeoutId);
+                    if (retries > 0) {
+                        if (error.message === "Connection timed out") {
+                            attemptConnection(retries - 1, delay * 2);
+                        } else {
+                            setTimeout(() =>attemptConnection(retries - 1, delay * 2), delay);
+                        }                        
+                    } else {
+                        reject(error);
+                    }
+                });
+            };
+
+            attemptConnection(10, 2000); // 10 retries with initial delay of 2 second
         });
     }
 
