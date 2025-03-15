@@ -26,4 +26,6 @@ export interface Keypad extends KeypadInterface {
      * @returns The device's state.
      */
     readonly status: KeypadState;
+    readonly isPhantom: boolean;
+    pressButton(button: Button): Promise<void>;
 }

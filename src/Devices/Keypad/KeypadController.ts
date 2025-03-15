@@ -3,6 +3,7 @@ import Colors from "colors";
 import { Button, DeviceType } from "@mkellsy/hap-device";
 
 import { AreaAddress } from "../../Response/AreaAddress";
+import { Address } from "../../Response/Address";
 import { ButtonStatus } from "../../Response/ButtonStatus";
 import { Common } from "../Common";
 import { DeviceAddress } from "../../Response/DeviceAddress";
@@ -16,6 +17,8 @@ import { Processor } from "../Processor/Processor";
  */
 export class KeypadController extends Common<KeypadState> implements Keypad {
     public readonly buttons: Button[] = [];
+    public readonly buttonAddresses = new Map<string, Address>;
+    public readonly isPhantom: boolean = false;
 
     /**
      * Creates a keypad device.
@@ -34,7 +37,10 @@ export class KeypadController extends Common<KeypadState> implements Keypad {
             state: "Off",
         });
 
-        if (device.DeviceType === "SunnataKeypad" || device.DeviceType === "SunnataHybridKeypad" || device.DeviceType === "SeeTouchHybridKeypad") {
+        if (device.DeviceType === "SunnataKeypad" || device.DeviceType === "SunnataHybridKeypad" || device.DeviceType === "SeeTouchHybridKeypad" || device.DeviceType === "PhantomKeypad") {
+            if (device.DeviceType === "PhantomKeypad") {
+                this.isPhantom = true;
+            }
             this.processor
                 .buttons(this.address)
                 .then((groups) => {
@@ -42,6 +48,7 @@ export class KeypadController extends Common<KeypadState> implements Keypad {
                         for (let j = 0; j < groups[i].Buttons?.length; j++) {
                             const button = groups[i].Buttons[j];
                             const id = `LEAP-${this.processor.id}-BUTTON-${button.href.split("/")[2]}`;
+                            this.buttonAddresses.set(id, {href: button.href});
 
                             const definition: Button = {
                                 id,
@@ -93,5 +100,14 @@ export class KeypadController extends Common<KeypadState> implements Keypad {
         return this.processor.update(status.led, "status", {
             LEDStatus: { State: status.state === "On" ? "On" : "Off" },
         });
+    }
+    
+    public pressButton(button: Button): Promise<void> {
+        if (this.buttonAddresses.has(button.id)) {
+            return this.processor.command(this.buttonAddresses.get(button.id) ?? {href:""}, {
+                CommandType: "PressAndRelease",
+            });
+    }
+    return Promise.reject(new Error("Button id is not a string"));
     }
 }

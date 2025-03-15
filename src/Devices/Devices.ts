@@ -112,6 +112,7 @@ export function parseDeviceType(value: string): DeviceType {
         case "SunnataKeypad":
         case "SunnataHybridKeypad":
         case "SeeTouchHybridKeypad":
+        case "PhantomKeypad":
             return DeviceType.Keypad;
 
         case "RPSCeilingMountedOccupancySensor":
@@ -135,6 +136,9 @@ export function parseDeviceType(value: string): DeviceType {
  * @private
  */
 export function isAddressable(device: DeviceAddress): boolean {
+    if (device.DeviceType === "PhantomKeypad") {
+        return true;
+    }
     if (device.AddressedState !== "Addressed") {
         return false;
     }
